@@ -1,0 +1,12 @@
+# Render Blueprint: деплой в один клик, если репозиторий подключён как Blueprint
+services:
+  - type: web
+    name: neon-pong
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"

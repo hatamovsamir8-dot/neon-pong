@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>NEON PONG — понг для двоих по ссылке</title>
+<style>
+  :root {
+    --cyan: #00e5ff;
+    --pink: #ff2d95;
+    --bg: #07080f;
+    --panel: #10131f;
+    --text: #e8ecf8;
+    --dim: #8b93ad;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(1200px 700px at 50% -10%, #141a33 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 16px;
+  }
+  .wrap { width: 100%; max-width: 860px; }
+
+  /* ---------- Меню ---------- */
+  #menu { text-align: center; padding: 40px 0; }
+  h1 {
+    font-size: clamp(44px, 9vw, 84px);
+    letter-spacing: 0.12em; font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 12px var(--cyan), 0 0 42px rgba(0,229,255,.55), 0 0 80px rgba(255,45,149,.35);
+    margin-bottom: 8px;
+  }
+  .sub { color: var(--dim); font-size: 17px; margin-bottom: 36px; }
+  .sub b { color: var(--text); }
+  .btn {
+    display: inline-block; border: none; cursor: pointer;
+    font-size: 19px; font-weight: 700; color: #04121a;
+    background: linear-gradient(135deg, var(--cyan), #6cf7d8);
+    padding: 16px 38px; border-radius: 14px;
+    box-shadow: 0 0 24px rgba(0,229,255,.45);
+    transition: transform .12s ease, box-shadow .12s ease;
+    text-decoration: none;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 0 36px rgba(0,229,255,.7); }
+  .btn:active { transform: translateY(0); }
+  .btn.pink { background: linear-gradient(135deg, var(--pink), #ff7ab8); color: #2a0416; box-shadow: 0 0 24px rgba(255,45,149,.45); }
+  .btn.ghost {
+    background: transparent; color: var(--dim); box-shadow: none;
+    border: 1px solid #2a3050; font-size: 15px; padding: 10px 20px;
+  }
+  .btn.ghost:hover { color: var(--text); border-color: #46508a; }
+  .rules { margin-top: 34px; color: var(--dim); font-size: 14px; line-height: 1.7; }
+
+  /* ---------- Игра ---------- */
+  #game { display: none; }
+  .topbar {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .roomchip {
+    flex: 1; min-width: 180px;
+    background: var(--panel); border: 1px solid #232a45; border-radius: 10px;
+    color: var(--dim); font-size: 13px; padding: 9px 12px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .roomchip b { color: var(--cyan); }
+  .iconbtn {
+    background: var(--panel); border: 1px solid #232a45; color: var(--text);
+    border-radius: 10px; padding: 8px 14px; font-size: 14px; cursor: pointer;
+    transition: border-color .12s;
+  }
+  .iconbtn:hover { border-color: #46508a; }
+  .stage { position: relative; }
+  canvas {
+    display: block; width: 100%; aspect-ratio: 8 / 5;
+    background: #0a0d18; border-radius: 16px;
+    border: 1px solid #1d2440;
+    box-shadow: 0 0 60px rgba(0,229,255,.07), inset 0 0 80px rgba(0,0,0,.5);
+    touch-action: none; cursor: none;
+  }
+  .hint { text-align: center; color: var(--dim); font-size: 13px; margin-top: 10px; }
+
+  /* ---------- Оверлеи ---------- */
+  .overlay {
+    position: absolute; inset: 0; border-radius: 16px;
+    background: rgba(5,7,14,.82); backdrop-filter: blur(3px);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 24px; gap: 14px;
+  }
+  .overlay.show { display: flex; }
+  .overlay h2 { font-size: clamp(22px, 4.5vw, 34px); text-shadow: 0 0 18px rgba(0,229,255,.5); }
+  .overlay p { color: var(--dim); font-size: 15px; max-width: 460px; line-height: 1.6; }
+  .linkrow { display: flex; gap: 8px; width: min(480px, 92%); }
+  .linkrow input {
+    flex: 1; min-width: 0; background: #0a0e1c; border: 1px solid #2a3050; color: var(--cyan);
+    border-radius: 10px; padding: 12px 14px; font-size: 14px; outline: none;
+  }
+  .spinner {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 3px solid #223; border-top-color: var(--cyan);
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #reconnect {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    background: #2a1e08; color: #ffd166; border: 1px solid #5a4310;
+    padding: 6px 16px; border-radius: 999px; font-size: 13px; display: none; z-index: 5;
+  }
+  .big-emoji { font-size: 52px; line-height: 1; }
+  .toast {
+    position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
+    background: #0e2a1e; color: #7dfcc4; border: 1px solid #1d5a40;
+    padding: 10px 22px; border-radius: 999px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 99;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Меню -->
+  <div id="menu">
+    <h1>NEON&nbsp;PONG</h1>
+    <div class="sub">Понг для двоих: <b>создай игру → кинь ссылку другу → играйте</b></div>
+    <button class="btn" id="createBtn">🎮 Создать игру</button>
+    <div class="rules">
+      Первый до <b style="color:var(--text)">7 очков</b> побеждает.<br>
+      Управление: мышь, касание экрана или клавиши W/S и ↑/↓.<br>
+      Мяч ускоряется с каждым отбитием — не зевай 😉
+    </div>
+  </div>
+
+  <!-- Игра -->
+  <div id="game">
+    <div class="topbar">
+      <div class="roomchip" id="roomChip">Комната <b>—</b></div>
+      <button class="iconbtn" id="copyBtn" title="Скопировать ссылку">🔗 Копировать</button>
+      <button class="iconbtn" id="soundBtn" title="Звук">🔊</button>
+      <button class="iconbtn" id="exitBtn" title="Выйти в меню">✕</button>
+    </div>
+    <div class="stage">
+      <canvas id="cv" width="800" height="500"></canvas>
+      <div id="reconnect">⚡ Связь потеряна, переподключаюсь…</div>
+
+      <!-- Ожидание друга -->
+      <div class="overlay" id="waitOverlay">
+        <div class="spinner"></div>
+        <h2>Ждём второго игрока…</h2>
+        <p>Отправь другу эту ссылку — игра начнётся, как только он откроет её:</p>
+        <div class="linkrow">
+          <input id="linkInput" readonly>
+          <button class="btn" id="copyBtn2" style="padding:12px 20px;font-size:15px">Копировать</button>
+        </div>
+        <p style="font-size:13px">Пока друга нет — <a href="#" id="secondTab" style="color:var(--cyan)">открой вторую вкладку</a> и потренируйся сам с собой 😄</p>
+      </div>
+
+      <!-- Конец матча -->
+      <div class="overlay" id="overOverlay">
+        <div class="big-emoji" id="overEmoji">🏆</div>
+        <h2 id="overTitle">Победа!</h2>
+        <p id="overScore"></p>
+        <button class="btn pink" id="rematchBtn">🔁 Реванш</button>
+        <button class="btn ghost" id="overExit">В меню</button>
+      </div>
+
+      <!-- Ошибка -->
+      <div class="overlay" id="errOverlay">
+        <div class="big-emoji">🚫</div>
+        <h2>Не получилось</h2>
+        <p id="errMsg"></p>
+        <button class="btn" id="errCreate">Создать новую игру</button>
+        <button class="btn ghost" id="errExit">В меню</button>
+      </div>
+    </div>
+    <div class="hint">🖱 мышь / 👆 касание / ⌨️ W-S или ↑-↓ &nbsp;·&nbsp; ты играешь <span id="youColor">своей</span> ракеткой</div>
+  </div>
+</div>
+<div class="toast" id="toast">Скопировано ✓</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const W = 800, H = 500, PW = 12, PH = 90, PX = 30, BR = 8;
+  const CYAN = '#00e5ff', PINK = '#ff2d95';
+
+  // ---------- состояние ----------
+  let ws = null, side = -1, roomId = null;
+  let state = null, prev = null;
+  let manualExit = false, retryTimer = null, retries = 0;
+  let targetY = 0.5, lastSentY = -1, lastSendAt = 0;
+  const keys = new Set();
+  const trail = [];
+  let muted = localStorage.getItem('pongMute') === '1';
+  let audio = null;
+
+  const urlRoom = new URLSearchParams(location.search).get('room');
+
+  // ---------- звук ----------
+  function initAudio() {
+    if (!audio) {
+      try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    }
+    if (audio && audio.state === 'suspended') audio.resume();
+  }
+  function beep(freq, dur = 0.06, type = 'square', vol = 0.05, when = 0) {
+    if (muted || !audio) return;
+    const t = audio.currentTime + when;
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(audio.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  window.addEventListener('pointerdown', initAudio, { passive: true });
+  window.addEventListener('keydown', initAudio);
+
+  function updateSoundBtn() { $('soundBtn').textContent = muted ? '🔇' : '🔊'; }
+  $('soundBtn').onclick = () => {
+    muted = !muted;
+    localStorage.setItem('pongMute', muted ? '1' : '0');
+    updateSoundBtn();
+  };
+  updateSoundBtn();
+
+  // ---------- WebSocket ----------
+  function wsUrl() {
+    return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+  }
+
+  function connect(create) {
+    clearTimeout(retryTimer);
+    try { if (ws) { ws.onclose = null; ws.close(); } } catch (e) {}
+    ws = new WebSocket(wsUrl());
+
+    ws.onopen = () => {
+      retries = 0;
+      $('reconnect').style.display = 'none';
+      if (create || !roomId) {
+        ws.send(JSON.stringify({ t: 'create' }));
+      } else {
+        const token = sessionStorage.getItem('pongTok_' + roomId);
+        ws.send(JSON.stringify({ t: 'join', room: roomId, token }));
+      }
+    };
+
+    ws.onmessage = (ev) => {
+      let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m.t === 'joined') {
+        side = m.side; roomId = m.room;
+        sessionStorage.setItem('pongTok_' + roomId, m.token);
+        history.replaceState(null, '', '?room=' + roomId);
+        enterGame();
+      } else if (m.t === 's') {
+        prev = state; state = m;
+        onState();
+      } else if (m.t === 'error') {
+        showError(m.msg);
+      }
+    };
+
+    ws.onclose = () => {
+      if (manualExit) return;
+      if ($('game').style.display === 'block') {
+        $('reconnect').style.display = 'block';
+        retries++;
+        if (retries <= 40) retryTimer = setTimeout(() => connect(false), 1500);
+      }
+    };
+    ws.onerror = () => { try { ws.close(); } catch (e) {} };
+  }
+
+  setInterval(() => { if (ws && ws.readyState === 1) ws.send('{"t":"ping"}'); }, 25000);
+
+  // ---------- экраны ----------
+  function show(el, on) { el.classList.toggle('show', on); }
+
+  function enterGame() {
+    $('menu').style.display = 'none';
+    $('game').style.display = 'block';
+    const link = location.origin + '/?room=' + roomId;
+    $('linkInput').value = link;
+    $('secondTab').href = link;
+    $('roomChip').innerHTML = 'Комната <b>' + roomId + '</b> · ты ' + (side === 0 ? 'слева' : 'справа');
+    $('youColor').textContent = side === 0 ? 'голубой (слева)' : 'розовой (справа)';
+    $('youColor').style.color = side === 0 ? CYAN : PINK;
+    show($('errOverlay'), false);
+  }
+
+  function exitToMenu() {
+    manualExit = true;
+    try { if (ws) ws.close(); } catch (e) {}
+    ws = null; roomId = null; side = -1; state = null; prev = null;
+    trail.length = 0;
+    history.replaceState(null, '', '/');
+    $('game').style.display = 'none';
+    $('menu').style.display = 'block';
+    show($('waitOverlay'), false); show($('overOverlay'), false); show($('errOverlay'), false);
+    $('reconnect').style.display = 'none';
+    manualExit = false;
+  }
+
+  function showError(msg) {
+    $('menu').style.display = 'none';
+    $('game').style.display = 'block';
+    $('errMsg').textContent = msg;
+    show($('waitOverlay'), false); show($('overOverlay'), false);
+    show($('errOverlay'), true);
+  }
+
+  let lastCdInt = -1;
+  function onState() {
+    const s = state;
+    show($('errOverlay'), false);
+    show($('waitOverlay'), s.ph === 'wait' || (!s.op && s.ph !== 'over'));
+    show($('overOverlay'), s.ph === 'over');
+
+    if (s.ph === 'over') {
+      const win = s.w === side;
+      $('overEmoji').textContent = win ? '🏆' : '😢';
+      $('overTitle').textContent = win ? 'Ты победил!' : 'Соперник победил';
+      $('overTitle').style.color = win ? '#7dfcc4' : '#ff9db8';
+      $('overScore').textContent = 'Счёт ' + s.sc[0] + ' : ' + s.sc[1] + (win ? ' — отличная игра!' : ' — реванш?');
+      if (!prev || prev.ph !== 'over') {
+        if (win) { beep(523, .12, 'square', .06); beep(659, .12, 'square', .06, .13); beep(784, .25, 'square', .06, .26); }
+        else { beep(392, .2, 'sawtooth', .04); beep(311, .35, 'sawtooth', .04, .2); }
+      }
+    }
+
+    if (s.ph === 'count') {
+      const n = Math.ceil(s.cd);
+      if (n !== lastCdInt) { lastCdInt = n; beep(440, .07, 'sine', .06); }
+    } else lastCdInt = -1;
+
+    if (prev && s.ph === 'play' && prev.ph === 'play') {
+      // определяем события по смене направления между кадрами
+      if (prevVx !== 0 && Math.sign(s.b[0] - prev.b[0]) !== Math.sign(prevVx) && s.b[0] - prev.b[0] !== 0) beep(620, .05, 'square', .06);
+      if (prevVy !== 0 && Math.sign(s.b[1] - prev.b[1]) !== Math.sign(prevVy) && s.b[1] - prev.b[1] !== 0) beep(240, .05, 'square', .04);
+      if (s.sc[0] !== prev.sc[0] || s.sc[1] !== prev.sc[1]) {
+        const weScored = s.sc[side] > prev.sc[side];
+        beep(weScored ? 700 : 200, .15, weScored ? 'triangle' : 'sawtooth', .06);
+        trail.length = 0;
+      }
+    }
+    if (prev && s.ph === 'play') { prevVx = s.b[0] - prev.b[0]; prevVy = s.b[1] - prev.b[1]; }
+    else { prevVx = 0; prevVy = 0; }
+  }
+  let prevVx = 0, prevVy = 0;
+
+  // ---------- кнопки ----------
+  $('createBtn').onclick = () => { manualExit = false; connect(true); };
+  $('errCreate').onclick = () => { roomId = null; manualExit = false; connect(true); };
+  $('exitBtn').onclick = exitToMenu;
+  $('errExit').onclick = exitToMenu;
+  $('overExit').onclick = exitToMenu;
+  $('rematchBtn').onclick = () => { if (ws && ws.readyState === 1) ws.send('{"t":"rematch"}'); };
+  $('secondTab').onclick = (e) => { e.preventDefault(); window.open($('linkInput').value, '_blank'); };
+
+  async function copyLink() {
+    const link = $('linkInput').value || (location.origin + '/?room=' + roomId);
+    let ok = false;
+    try { await navigator.clipboard.writeText(link); ok = true; } catch (e) {
+      try {
+        $('linkInput').select();
+        ok = document.execCommand('copy');
+      } catch (e2) {}
+    }
+    const t = $('toast');
+    t.textContent = ok ? 'Скопировано ✓ Отправляй другу!' : 'Скопируй ссылку вручную из поля';
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1800);
+  }
+  $('copyBtn').onclick = copyLink;
+  $('copyBtn2').onclick = copyLink;
+  $('linkInput').onclick = () => $('linkInput').select();
+
+  // ---------- управление ----------
+  const cv = $('cv');
+  function pointerY(e) {
+    const r = cv.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+  }
+  cv.addEventListener('pointermove', (e) => { targetY = pointerY(e); });
+  cv.addEventListener('pointerdown', (e) => { targetY = pointerY(e); sendMove(true); });
+
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowUp', 'ArrowDown', ' '].includes(e.key)) e.preventDefault();
+    keys.add(e.key.toLowerCase());
+  });
+  window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+
+  function sendMove(force) {
+    const now = performance.now();
+    if (!ws || ws.readyState !== 1 || !state) return;
+    if (!force && now - lastSendAt < 33) return;
+    if (Math.abs(targetY - lastSentY) < 0.0005 && !force) return;
+    lastSendAt = now; lastSentY = targetY;
+    ws.send(JSON.stringify({ t: 'move', y: Math.round(targetY * 1000) / 1000 }));
+  }
+
+  // ---------- отрисовка ----------
+  const ctx = cv.getContext('2d');
+  function fitCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const r = cv.getBoundingClientRect();
+    cv.width = Math.round(r.width * dpr);
+    cv.height = Math.round(r.width * dpr * H / W);
+  }
+  window.addEventListener('resize', fitCanvas);
+
+  let lastFrame = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - lastFrame) / 1000);
+    lastFrame = now;
+
+    // клавиатура
+    const kSpeed = 1.4; // экранов в секунду
+    if (keys.has('w') || keys.has('arrowup') || keys.has('ц')) targetY -= kSpeed * dt;
+    if (keys.has('s') || keys.has('arrowdown') || keys.has('ы')) targetY += kSpeed * dt;
+    targetY = Math.max(0, Math.min(1, targetY));
+    sendMove(false);
+
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  function draw() {
+    const scale = cv.width / W;
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+
+    // фон
+    ctx.clearRect(0, 0, W, H);
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, '#0b0f1e'); grad.addColorStop(1, '#0a0c16');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // центральная линия
+    ctx.strokeStyle = 'rgba(120,135,190,.25)';
+    ctx.lineWidth = 3; ctx.setLineDash([12, 14]);
+    ctx.beginPath(); ctx.moveTo(W / 2, 12); ctx.lineTo(W / 2, H - 12); ctx.stroke();
+    ctx.setLineDash([]);
+
+    const s = state;
+    const p = s ? s.p : [H / 2 - PH / 2, H / 2 - PH / 2];
+    const sc = s ? s.sc : [0, 0];
+
+    // счёт
+    ctx.font = '900 64px "Courier New", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillStyle = 'rgba(0,229,255,.8)';
+    ctx.shadowColor = CYAN; ctx.shadowBlur = 18;
+    ctx.fillText(sc[0], W / 2 - 80, 22);
+    ctx.fillStyle = 'rgba(255,45,149,.8)';
+    ctx.shadowColor = PINK;
+    ctx.fillText(sc[1], W / 2 + 80, 22);
+    ctx.shadowBlur = 0;
+
+    // ракетки
+    drawPaddle(PX, p[0], CYAN, side === 0);
+    drawPaddle(W - PX - PW, p[1], PINK, side === 1);
+
+    // мяч и след
+    if (s && (s.ph === 'play' || s.ph === 'count')) {
+      const [bx, by] = s.b;
+      if (s.ph === 'play') {
+        trail.push({ x: bx, y: by });
+        if (trail.length > 12) trail.shift();
+      }
+      for (let i = 0; i < trail.length; i++) {
+        const a = (i + 1) / trail.length * 0.28;
+        ctx.fillStyle = 'rgba(255,255,255,' + a + ')';
+        ctx.beginPath();
+        ctx.arc(trail[i].x, trail[i].y, BR * (0.4 + 0.6 * (i + 1) / trail.length), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 22;
+      ctx.beginPath(); ctx.arc(bx, by, BR, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    // отсчёт
+    if (s && s.ph === 'count') {
+      ctx.font = '900 110px "Courier New", monospace';
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = CYAN; ctx.shadowBlur = 34;
+      ctx.textBaseline = 'middle';
+      ctx.fillText(Math.ceil(s.cd), W / 2, H / 2 - 20);
+      ctx.shadowBlur = 0;
+      ctx.font = '700 20px Arial';
+      ctx.fillStyle = 'rgba(139,147,173,.9)';
+      ctx.fillText('приготовься…', W / 2, H / 2 + 62);
+    }
+  }
+
+  function drawPaddle(x, y, color, mine) {
+    ctx.shadowColor = color; ctx.shadowBlur = 24;
+    ctx.fillStyle = color;
+    roundRect(x, y, PW, PH, 6); ctx.fill();
+    ctx.shadowBlur = 0;
+    if (mine) {
+      ctx.font = '700 14px Arial';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = 'rgba(232,236,248,.75)';
+      ctx.fillText('ТЫ', x + PW / 2, H - 8);
+    }
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ---------- старт ----------
+  fitCanvas();
+  requestAnimationFrame(frame);
+  if (urlRoom) {
+    roomId = urlRoom.toUpperCase();
+    manualExit = false;
+    connect(false); // зашли по ссылке друга
+  }
+})();
+</script>
+</body>
+</html>
